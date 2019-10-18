@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS `feed_item` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `data` TEXT NULL,
+  PRIMARY KEY (`id`))
