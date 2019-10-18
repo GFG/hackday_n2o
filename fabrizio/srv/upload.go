@@ -3,6 +3,7 @@ package srv
 import (
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"path/filepath"
 	"time"
@@ -28,6 +29,12 @@ type (
 	}
 )
 
+const (
+	inputUploadedFile = "fileToUpload"
+	fileTypeExcel = ".xslx"
+	fileTypeCSV = ".csv"
+)
+
 func UploadHandler(server *gin.Engine, validator Validator, excelReader Reader, csvReader Reader) {
 	u := &uploadHandler{
 		validator: validator,
@@ -40,25 +47,30 @@ func UploadHandler(server *gin.Engine, validator Validator, excelReader Reader, 
 
 func (u *uploadHandler) Upload(c *gin.Context) {
 	t1 := time.Now()
-	fmt.Println("Upload working")
+	log.Println("Upload working")
 
-	// Source
-	file, err := c.FormFile("fileToUpload")
+	file, err := c.FormFile(inputUploadedFile)
 	if err != nil {
-		c.String(http.StatusBadRequest, fmt.Sprintf("get form err: %s", err.Error()))
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": err.Error(),
+		})
 		return
 	}
 
 	filename := filepath.Base(file.Filename)
 	if err := c.SaveUploadedFile(file, filename); err != nil {
-		c.String(http.StatusBadRequest, fmt.Sprintf("upload file err: %s", err.Error()))
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": err.Error(),
+		})
 		return
 	}
 
 	reader, err := u.getReaderByType(filename)
 
 	if err != nil {
-		c.String(http.StatusBadRequest, err.Error())
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": err.Error(),
+		})
 		return
 	}
 
@@ -66,19 +78,11 @@ func (u *uploadHandler) Upload(c *gin.Context) {
 	rows, err := reader.Read(filename)
 
 	if err != nil {
-		c.String(http.StatusBadRequest, err.Error())
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": err.Error(),
+		})
 		return
 	}
-
-	//printRows(rows)
-
-	//isValid, err := u.validator.ValidateFields(rows)
-	//
-	//if err != nil {
-	//	c.String(http.StatusBadRequest, err.Error())
-	//	return
-	//}
-
 
 	t2 := time.Now()
 
@@ -97,34 +101,16 @@ func (u *uploadHandler) Upload(c *gin.Context) {
 func (u *uploadHandler) getReaderByType(filename string) (Reader, error) {
 	ext := filepath.Ext(filename)
 
-	if ext == ".xlsx" {
+	if ext == fileTypeExcel {
 		return u.excelReader, nil
 	}
 
-	if ext == ".csv" {
+	if ext == fileTypeCSV {
 		return u.csvReader, nil
 	}
 
 	return nil, errors.New(fmt.Sprintf("unsupported extension: %s", ext))
 }
 
-func printRows(rows [][]string) {
-	var product map[string]string
-	headers := rows[0]
-
-	for k, row := range rows {
-		if k == 0 {
-			continue
-		}
-
-		product = map[string]string{}
-
-		for pos, value := range row {
-			product[headers[pos]] = value
-		}
-
-		fmt.Println(product)
-	}
-}
 
 
